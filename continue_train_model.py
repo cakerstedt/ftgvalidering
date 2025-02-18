@@ -1,7 +1,10 @@
 from transformers import GPT2Tokenizer, GPT2LMHeadModel, Trainer, TrainingArguments
 import torch
 from datasets import Dataset
-import pandas as pd
+import os
+
+# Ange sökvägen till den senaste checkpointen
+CHECKPOINT_PATH = "models/gpt2_model/checkpoint-4"
 
 # Ladda och förbered data från den bearbetade filen
 def load_and_process_data(file_path):
@@ -15,7 +18,7 @@ def tokenize_function(examples):
     return tokens
 
 # Filväg för bearbetad data
-DATA_FILE = "bolagsverket_bulkfil.txt"
+DATA_FILE = "more_training_data.txt"
 
 # Ladda dataset
 train_texts = load_and_process_data(DATA_FILE)
@@ -28,7 +31,7 @@ tokenizer.pad_token = tokenizer.eos_token  # GPT-2 har ingen standard pad-token,
 train_dataset = Dataset.from_dict({"text": train_texts}).map(tokenize_function, batched=True)
 
 # Initiera GPT-2 modell
-model = GPT2LMHeadModel.from_pretrained("openai-community/gpt2")
+model = GPT2LMHeadModel.from_pretrained(CHECKPOINT_PATH)
 
 # Träningsargument
 training_args = TrainingArguments(
@@ -51,6 +54,7 @@ trainer = Trainer(
 # Träna modellen
 trainer.train()
 
-# Spara modellen
-model.save_pretrained("models/gpt2_model")
-tokenizer.save_pretrained("models/gpt2_model")
+# Spara modellen i en separat checkpoint-mapp
+checkpoint_dir = f"models/gpt2_model/checkpoint-{trainer.state.global_step // 1000 + 1}"  # Sätter checkpoint-nummer baserat på träningssteg
+model.save_pretrained(checkpoint_dir)
+tokenizer.save_pretrained(checkpoint_dir)

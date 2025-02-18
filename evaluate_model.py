@@ -1,18 +1,46 @@
-from transformers import DistilBertForSequenceClassification, DistilBertTokenizer
+from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import torch
-from sklearn.metrics import accuracy_score
+import math
+from datasets import load_dataset
 
-# Ladda modell
-model = DistilBertForSequenceClassification.from_pretrained("../models/distilbert_model")
-tokenizer = DistilBertTokenizer.from_pretrained("../models/distilbert_model")
+# Ange rätt modellväg
+MODEL_PATH = "models/gpt2_model"
+CHECKPOINT_PATH = "models/gpt2_model/checkpoint-4"
 
-def predict(texts):
-    inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
-    with torch.no_grad():
-        logits = model(**inputs).logits
-    return torch.argmax(logits, dim=-1).tolist()
+# Ladda tokenizer från huvudmodellen
+tokenizer = GPT2Tokenizer.from_pretrained(MODEL_PATH)
 
-# Testa modellen
-test_preds = predict(test_texts)
-accuracy = accuracy_score(test_labels, test_preds)
-print(f"Test accuracy: {accuracy:.2f}")
+# Ladda modellen från checkpoint
+model = GPT2LMHeadModel.from_pretrained(CHECKPOINT_PATH)
+
+# Ladda testdataset (justera efter ditt dataset)
+test_dataset = load_dataset('text', data_files={'test': 'test_data.txt'})['test']
+
+# Funktion för att utvärdera modellen
+def evaluate_model(test_dataset, model):
+    model.eval()
+    total_loss = 0
+    total_steps = 0
+    
+    for example in test_dataset:
+        inputs = tokenizer.encode(example['text'], return_tensors="pt", max_length=512, truncation=True)
+        labels = inputs.clone()
+
+        with torch.no_grad():
+            outputs = model(input_ids=inputs, labels=labels)
+            loss = outputs.loss.item()
+        
+        total_loss += loss
+        total_steps += 1
+    
+    avg_loss = total_loss / total_steps
+    perplexity = math.exp(avg_loss)
+    
+    return avg_loss, perplexity
+
+# Beräkna loss och perplexity
+loss, perplexity = evaluate_model(test_dataset, model)
+
+# Skriv ut resultat
+print(f"Eval Loss: {loss:.4f}")
+print(f"Perplexity: {perplexity:.4f}")
